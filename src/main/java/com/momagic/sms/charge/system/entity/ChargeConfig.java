@@ -18,8 +18,8 @@ import java.time.LocalDateTime;
 @Table(name = "charge_config")
 public class ChargeConfig {
     @Id
-    private String chargeCode;
     private String operator;
+    private String chargeCode;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
