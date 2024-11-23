@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Configuration
@@ -15,9 +16,9 @@ public class Config {
         return new RestTemplate();
     }
 
-//    @Bean(name = "taskExecutor")
-//    public Executor taskExecutor() {
-//        return Executors.newVirtualThreadPerTaskExecutor();
-//    }
+    @Bean
+    public ExecutorService virtualThreadExecutor() {
+        return Executors.newVirtualThreadPerTaskExecutor();
+    }
 
 }

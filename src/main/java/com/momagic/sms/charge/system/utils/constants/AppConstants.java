@@ -1,4 +1,4 @@
-package com.momagic.sms.charge.system.utils;
+package com.momagic.sms.charge.system.utils.constants;
 
 public class AppConstants {
 
