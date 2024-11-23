@@ -52,22 +52,22 @@ public class ContentRetrievalServiceImpl implements ContentRetrievalService {
     }
 
     private Inbox mapToInbox(Content content) {
-        Inbox inbox = new Inbox();
         String[] parts = content.getSms().split(" ");
-        if (parts.length >= 4) {
-            inbox.setKeyword(parts[0]);
-            inbox.setGameName(parts[1]);
-        }
-        inbox.setTransactionId(content.getTransactionId());
-        inbox.setOperator(content.getOperator());
-        inbox.setShortCode(content.getShortCode());
-        inbox.setMsisdn(content.getMsisdn());
-        inbox.setSms(content.getSms());
-        inbox.setStatus(AppConstants.N);
-        inbox.setCreatedAt(LocalDateTime.now());
-        inbox.setUpdatedAt(LocalDateTime.now());
+        String keyword = parts.length >= 1 ? parts[0] : null;
+        String gameName = parts.length >= 2 ? parts[1] : null;
 
-        return inbox;
+        return Inbox.builder()
+                .keyword(keyword)
+                .gameName(gameName)
+                .transactionId(content.getTransactionId())
+                .operator(content.getOperator())
+                .shortCode(content.getShortCode())
+                .msisdn(content.getMsisdn())
+                .sms(content.getSms())
+                .status(AppConstants.N)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 
 }
