@@ -13,7 +13,6 @@ import lombok.experimental.Accessors;
 @AllArgsConstructor
 public class ChargeResponse {
 
-
     private int statusCode;
     private String message;
     private String transactionId;
