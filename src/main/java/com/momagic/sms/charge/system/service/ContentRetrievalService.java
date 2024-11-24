@@ -54,7 +54,7 @@ public class ContentRetrievalService {
         try {
             ResponseEntity<ContentResponse> response = restTemplate.getForEntity(contentUrl, ContentResponse.class);
 
-            if (response != null && response.getStatusCode() == HttpStatus.OK) {
+            if (response.getStatusCode().is2xxSuccessful()) {
                 ContentResponse contentResponse = response.getBody();
                 if (contentResponse != null && contentResponse.getStatusCode() == 200 && !contentResponse.getContents().isEmpty()) {
                     for (Content content : contentResponse.getContents()) {
@@ -64,7 +64,7 @@ public class ContentRetrievalService {
                     log.info("Empty content response or unsuccessful status code: {}", contentResponse);
                 }
             } else {
-                log.warn("Failed to fetch content: {}", response.getStatusCodeValue());
+                log.warn("Failed to fetch content: {}", response);
             }
         } catch (Exception e) {
             log.error("Error fetching content", e);

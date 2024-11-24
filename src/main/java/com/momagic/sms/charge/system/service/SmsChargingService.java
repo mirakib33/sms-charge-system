@@ -16,10 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -46,10 +48,10 @@ public class SmsChargingService {
     @Value("${api.charge.url}") // Injects charge API URL from application.properties
     private String chargeUrl;
 
+    @Value("${inbox.fetch.limit}") // Injects from application.properties to fetches inbox data in chunks
+    private int inboxLimit;
 
     private int inboxOffset = 0;
-
-    private final int INBOX_LIMIT = 5000; //Each request fetches inbox data in chunks to save it
 
 
     @PostConstruct
@@ -68,7 +70,7 @@ public class SmsChargingService {
         try {
             int totalInbox = (int) inboxRepository.count();
             while(inboxOffset < totalInbox) {
-                List<Inbox> inboxData = inboxRepository.findAllByStatus(AppConstants.N, INBOX_LIMIT, inboxOffset);
+                List<Inbox> inboxData = inboxRepository.findAllByStatus(AppConstants.N, inboxLimit, inboxOffset);
                 inboxOffset = inboxOffset + inboxData.size();
                 inboxData.forEach(this::processSingleInboxData);
             }
@@ -76,7 +78,6 @@ public class SmsChargingService {
             log.error("Error processing inbox data: {}", e.getMessage());
         }
     }
-
 
 
     private void processSingleInboxData(Inbox inbox) {
@@ -110,7 +111,7 @@ public class SmsChargingService {
                 inboxRepository.save(inbox);
             }
         } catch (Exception e) {
-            log.error("Error processing message: {}", inbox.getId(), e);
+            log.error("Error processing single inbox data by inbox id: {} {}", inbox.getId(), e.getMessage());
         }
     }
 
@@ -122,12 +123,14 @@ public class SmsChargingService {
                     unlockCodeUrl, requestBody, UnlockCodeResponse.class
             );
 
-            if (response != null && response.getStatusCode() == HttpStatus.OK) {
+            if (response.getStatusCode().is2xxSuccessful()) {
                 return true;
+            } else {
+                log.warn("Failed to fetch get unlock code: {}", response);
             }
             return false;
         } catch (Exception e) {
-            log.error("Error processing unlockCode: {}", inbox.getId(), e);
+            log.error("Error processing unlockCode {}", e.getMessage());
             return false;
         }
     }
@@ -153,14 +156,16 @@ public class SmsChargingService {
             ResponseEntity<ChargeResponse> response = restTemplate.postForEntity(
                     chargeUrl, requestBody, ChargeResponse.class
             );
-            if (response != null && response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful()) {
                 return true;
             }
+
+            log.warn("Failed to charge: {}", response);
             logFailure(inbox, response.getBody());
             return false;
         } catch (Exception e) {
             logFailure(inbox, null);
-            log.error("Error processing charge performing by inbox id: {} {}", inbox.getId(), e.getMessage());
+            log.error("Error processing charge performing {}", e.getMessage());
             return false;
         }
     }
