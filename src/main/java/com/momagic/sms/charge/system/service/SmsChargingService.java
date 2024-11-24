@@ -11,6 +11,7 @@ import com.momagic.sms.charge.system.repository.*;
 import com.momagic.sms.charge.system.utils.constants.AppConstants;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.DependsOn;
@@ -29,7 +30,7 @@ import java.util.concurrent.ExecutorService;
 @Service
 @DependsOn("contentRetrievalService")
 @RequiredArgsConstructor
-public class SmsProcessingService {
+public class SmsChargingService {
 
     private final InboxRepository inboxRepository;
     private final KeywordDetailsRepository keywordDetailsRepository;
@@ -39,48 +40,62 @@ public class SmsProcessingService {
     private final RestTemplate restTemplate;
     private final ExecutorService virtualThreadExecutor;
 
-    @Value("${api.unlock.code.url}")
+    @Value("${api.unlock.code.url}") // Injects unlock code API URL from application.properties
     private String unlockCodeUrl;
 
-    @Value("${api.charge.url}")
+    @Value("${api.charge.url}") // Injects charge API URL from application.properties
     private String chargeUrl;
+
+
+    private int inboxOffset = 0;
+
+    private final int INBOX_LIMIT = 5000; //Each request fetches inbox data in chunks to save it
 
 
     @PostConstruct
     public void init() {
-        virtualThreadExecutor.submit(this::processInboxMessages);
+        virtualThreadExecutor.submit(this::processInboxData);
     }
+
 
     @Scheduled(fixedRate = 8 * 60 * 60 * 1000) // Every 8 hours
     public void scheduledTask() {
-        virtualThreadExecutor.submit(this::processInboxMessages);
+        virtualThreadExecutor.submit(this::processInboxData);
     }
 
 
-    public void processInboxMessages() {
-        List<Inbox> inboxMessages = inboxRepository.findAllByStatus(AppConstants.N);
-
-        inboxMessages.forEach(this::processSingleMessage);
+    public void processInboxData() {
+        try {
+            int totalInbox = (int) inboxRepository.count();
+            while(inboxOffset < totalInbox) {
+                List<Inbox> inboxData = inboxRepository.findAllByStatus(AppConstants.N, INBOX_LIMIT, inboxOffset);
+                inboxOffset = inboxOffset + inboxData.size();
+                inboxData.forEach(this::processSingleInboxData);
+            }
+        } catch (Exception e) {
+            log.error("Error processing inbox data: {}", e.getMessage());
+        }
     }
 
-    @Async
-    private void processSingleMessage(Inbox inbox) {
+
+
+    private void processSingleInboxData(Inbox inbox) {
         try {
             // Validate keyword dynamically
             boolean isValidKeyword = keywordDetailsRepository.existsById(inbox.getKeyword());
             if (!isValidKeyword) {
-                inbox.setStatus(AppConstants.F);
-                inbox.setUpdatedAt(LocalDateTime.now());
-                inboxRepository.save(inbox);
+//                inbox.setStatus(AppConstants.F);
+//                inbox.setUpdatedAt(LocalDateTime.now());
+//                inboxRepository.save(inbox);
                 return;
             }
 
             // Retrieve unlock code
             boolean isUnlockedCode = getUnlockCode(inbox);
             if (!isUnlockedCode) {
-                inbox.setStatus(AppConstants.F);
-                inbox.setUpdatedAt(LocalDateTime.now());
-                inboxRepository.save(inbox);
+//                inbox.setStatus(AppConstants.F);
+//                inbox.setUpdatedAt(LocalDateTime.now());
+//                inboxRepository.save(inbox);
                 return;
             }
 
@@ -131,9 +146,9 @@ public class SmsProcessingService {
     private boolean performCharging(Inbox inbox) {
         try {
             String chargeCode = chargeConfigRepository.findChargeCodeByOperator(inbox.getOperator())
-                    .orElseThrow(() -> new RuntimeException("Charge code not found for operator: " + inbox.getOperator()));
+                    .orElseThrow(() -> new RuntimeException("Charge code not found"));
 
-            ChargeRequestBody requestBody = maptoChargeRequestBody(inbox, chargeCode);
+            ChargeRequestBody requestBody = mapToChargeRequestBody(inbox, chargeCode);
 
             ResponseEntity<ChargeResponse> response = restTemplate.postForEntity(
                     chargeUrl, requestBody, ChargeResponse.class
@@ -145,12 +160,12 @@ public class SmsProcessingService {
             return false;
         } catch (Exception e) {
             logFailure(inbox, null);
-            log.error("Error processing charge performing: {}", inbox.getId(), e);
+            log.error("Error processing charge performing by inbox id: {} {}", inbox.getId(), e.getMessage());
             return false;
         }
     }
 
-    private ChargeRequestBody maptoChargeRequestBody(Inbox inbox, String chargeCode) {
+    private ChargeRequestBody mapToChargeRequestBody(Inbox inbox, String chargeCode) {
         return ChargeRequestBody.builder()
                 .transactionId(inbox.getTransactionId())
                 .operator(inbox.getOperator())

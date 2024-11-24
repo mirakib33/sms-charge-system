@@ -27,19 +27,29 @@ public class ContentRetrievalService {
     private final RestTemplate restTemplate;
     private final ExecutorService virtualThreadExecutor;
 
-    @Value("${api.content.url}")
+    @Value("${api.content.url}")     // Injects content API URL from application properties
     private String contentUrl;
 
+    /**
+     * Initializes the service by scheduling the initial content fetch.
+     * Runs after bean creation (or starting time of the application)
+     */
     @PostConstruct
     public void init() {
         virtualThreadExecutor.submit(this::fetchAndInsertContent);
     }
 
+    /**
+     * Schedules a task to fetch and insert content every 6 hours.
+     */
     @Scheduled(fixedRate = 6 * 60 * 60 * 1000) // Every 6 hours
     public void scheduledTask() {
         virtualThreadExecutor.submit(this::fetchAndInsertContent);
     }
 
+    /**
+     * Fetches content from the content provider service and inserts it into the database.
+     */
     public void fetchAndInsertContent() {
         try {
             ResponseEntity<ContentResponse> response = restTemplate.getForEntity(contentUrl, ContentResponse.class);
@@ -61,8 +71,14 @@ public class ContentRetrievalService {
         }
     }
 
+    /**
+     * Maps a `Content` object to an `Inbox` object for database storage.
+     *
+     * @param content The content to be mapped
+     * @return The mapped Inbox object
+     */
     private Inbox mapToInbox(Content content) {
-        String[] parts = content.getSms().split(" ");
+        String[] parts = content.getSms().split(" "); // Splits SMS content into parts (keyword and gameName)
         String keyword = parts.length >= 1 ? parts[0] : null;
         String gameName = parts.length >= 2 ? parts[1] : null;
 
