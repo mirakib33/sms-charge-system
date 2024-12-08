@@ -1,5 +1,5 @@
 # SMS CHARGE SYSTEM
-### A system by MoMagic to retrieve inbox content, validate keywords, retrieve unlock codes, and handle charging operations efficiently.
+### A system to retrieve inbox content, validate keywords, retrieve unlock codes, and handle charging operations efficiently.
 
 ## Application Dependencies
 
